@@ -1,0 +1,87 @@
+import scapy.all as scapy
+import socket
+import time
+
+def aton(ip):
+     return socket.inet_aton(ip)
+
+# Craft a packet with the specified IP addresses
+def gen_packet(proto, src_ip, dst_ip, payload):
+    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    pl = payload
+    pkt = eth/ip/udp/pl
+    return str(pkt)
+
+packets = []
+payload = []
+f = open("anomalousTrafficTest.txt")
+text = ""
+for i in f:
+  if(i.startswith("POST") or i.startswith("GET")):
+    packets.append(text)
+    text=i
+  else:
+    text = text + i
+
+f.close()
+for i in range(10):
+  payload.append(gen_packet(scapy.TCP, '172.16.100.1', '10.0.0.1', packets[i]))
+
+ma = Measure()
+mb = Measure()
+print ("hi")
+blacklist_rules = [{'host': 'localhost:8080', 'path': '/'}]
+
+filter::UrlFilter(blacklist=blacklist_rules)
+
+s::Source() -> Rewrite(templates=payload) -> Dump(interval=1) -> Timestamp() -> ma -> 0:filter
+filter:0 -> mb -> Sink()
+filter:1 -> Sink()
+
+bess.add_tc('pktgen', policy='rate_limit',
+            resource='packet', limit={'packet': 150})
+s.attach_task('pktgen')
+
+start_time = time.time()
+last_time = start_time
+last_time1 = start_time
+
+bess.resume_all()
+
+print('{} RTT (us)                             '.format(' ' * 41), end='')
+print('   jitter (us)')
+print('{}    avg    min    50%    99%      max '.format(' ' * 41), end='')
+print('      avg    min    50%    99%      max')
+
+while True:
+    time.sleep(2)
+
+    # get_summary() doesn't require workers to be stopped
+    ret = ma.get_summary(clear=True,  # reset stats every interval
+                        latency_percentiles=[55, 99],
+                        jitter_percentiles=[55, 99])
+
+    diff_ts = ret.timestamp - last_time
+    diff_pkts = ret.packets / diff_ts
+    diff_bits = ret.bits / diff_ts
+    last_time = ret.timestamp
+
+    print('%12.6f: %5.3f Mpps, %5.3f np, %8.3f Mbps, ' \
+          '%7.3f %6.1f %6.1f %6.1f %8.1f   %7.3f %6.1f %6.1f %6.1f %8.1f' %
+          (ret.timestamp - start_time,
+           diff_pkts / 1e6,
+           ret.packets,
+           diff_bits / 1e6,
+           ret.latency.avg_ns / 1e3,
+           ret.latency.min_ns / 1e3,
+           ret.latency.percentile_values_ns[0] / 1e3,
+           ret.latency.percentile_values_ns[1] / 1e3,
+           ret.latency.max_ns / 1e3,
+           ret.jitter.avg_ns / 1e3,
+           ret.jitter.min_ns / 1e3,
+           ret.jitter.percentile_values_ns[0] / 1e3,
+           ret.jitter.percentile_values_ns[1] / 1e3,
+           ret.jitter.max_ns / 1e3))
+                                                                                                                                                                                          112,19        Bot
