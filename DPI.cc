@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <tuple>
-#include <python3.6/Python.h>
+#include <python2.7/Python.h>
 #include "../utils/checksum.h"
 #include "../utils/ether.h"
 #include "../utils/format.h"
@@ -235,6 +235,23 @@ void DPI::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
 
     //Print the packet payload
     std::cout << dump.str();
+    Py_Initialize();
+    PyRun_SimpleString ("import sys; sys.path.insert(0, '/home/ubuntu/bess/bessctl')");
+
+    PyObject* myModuleString = PyString_FromString("nlp");
+    PyObject* myModule = PyImport_Import(myModuleString);
+    if (myModule == NULL) {
+      printf("ERROR importing module");
+      exit(-1);
+    } 
+    Py_DECREF(myModuleString);
+    PyObject* myFunction = PyObject_GetAttrString(myModule,"foo");
+    PyObject* args = PyTuple_Pack(1,PyLong_FromLong(2));
+    PyObject* myResult = PyObject_CallObject(myFunction, args);
+    long result = PyLong_AsLong(myResult);
+    Py_Finalize();
+    std::cout << "My result is --------------- " << result;
+    
 
     Ethernet *eth = pkt->head_data<Ethernet *>();
     Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
