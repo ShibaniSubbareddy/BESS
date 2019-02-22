@@ -1,5 +1,5 @@
 #include "DPI.h"
-#include <rte_hexdump.h>
+
 #include <algorithm>
 #include <tuple>
 
@@ -59,7 +59,7 @@ struct[[gnu::packed]] PacketTemplate {
     tcp.window = be16_t(0);
     tcp.checksum = 0;  // To fill in
     tcp.urgent_ptr = be16_t(0);
-    }
+  }
 };
 
 static const char HTTP_HEADER_HOST[] = "Host";
@@ -218,18 +218,27 @@ void DPI::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];
     std::cout << "This is my dpi module";
-
+    std::ostringstream dump;
     printf("----------------------------------------\n");
-    printf("%s: packet dump\n", name().c_str());
-    std::cout << pkt->Dump();
-    rte_hexdump(stdout, "Metadata buffer", pkt->metadata<const char *>(),
-                SNBUF_METADATA);
+    size_t j, ofs;
+    ofs = 0;
+    size_t len = pkt->total_len();
+    const char *data = reinterpret_cast<const char *>(pkt->head_data());
+    for (j = 0; (ofs < len) && (j < 100); j++, ofs++) {
+      char c = data[ofs];
+      if ((c < ' ') || (c > '~')) {
+        c = '.';
+      }
+      dump << c;
+    }
+    dump << std::endl;
 
-
-  RunChooseModule(ctx, ctx->current_igate, batch);
+    //Print the packet payload
+    std::cout << dump.str();
 
     Ethernet *eth = pkt->head_data<Ethernet *>();
     Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
+
     if (ip->protocol != Ipv4::Proto::kTcp) {
       EmitPacket(ctx, pkt, 0);
       continue;
@@ -344,7 +353,8 @@ void DPI::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
                                           ip->dst, tcp->src_port, tcp->dst_port,
                                           tcp->seq_num, tcp->ack_num),
                  0);
-// Inject 403 to source. 403 should arrive earlier than RST.
+
+      // Inject 403 to source. 403 should arrive earlier than RST.
       EmitPacket(ctx, Generate403Packet(eth->dst_addr, eth->src_addr, ip->dst,
                                         ip->src, tcp->dst_port, tcp->src_port,
                                         tcp->ack_num, tcp->seq_num),
