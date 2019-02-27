@@ -34,7 +34,7 @@ mb = Measure()
 print ("hi")
 blacklist_rules = [{'host': 'localhost:8080', 'path': '/'}]
 
-filter::UrlFilter(blacklist=blacklist_rules)
+filter::DPI(blacklist=blacklist_rules)
 
 s::Source() -> Rewrite(templates=payload) -> Dump(interval=1) -> Timestamp() -> ma -> 0:filter
 filter:0 -> mb -> Sink()
